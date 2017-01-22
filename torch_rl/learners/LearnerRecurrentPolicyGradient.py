@@ -2,8 +2,9 @@ from torch_rl.learners import Learner,LearnerLog
 from torch.autograd import Variable
 from torch_rl.tools import Memory
 import torch
-from torch_rl.policies import DiscreteModelPolicy
 import numpy as np
+import gym.spaces
+from torch_rl.policies import Policy
 
 class LearnerRecurrentPolicyGradient(Learner):
     '''
@@ -119,5 +120,53 @@ class LearnerRecurrentPolicyGradient(Learner):
         Params:
             - stochastic: True if one wants a stochastic policy, False if one wants a policy based on the argmax of the output probabilities
         '''
-        assert stochastic==False
-        return DiscreteModelPolicy(self.actions_space,self.torch_model)
+        return DiscreteRecurrentModelPolicy(self.action_space,self.torch_model_action,self.torch_model_recurrent,self.initial_state,stochastic)
+
+
+class DiscreteRecurrentModelPolicy(Policy):
+    '''A Discrete policy based on a recurrent neural network'''
+
+    def __init__(self, action_space, torch_model_action,torch_model_recurrent,initial_state,stochastic=False):
+        Policy.__init__(self, action_space)
+        assert isinstance(action_space, gym.spaces.Discrete), "In DiscreteModelPolicy, the action space must be discrete"
+        #assert isinstance(sensor_space, torch_rl.spaces.PytorchBox), "In DeeQPolicy, sensor_space must be a PytorchBox"
+
+        self.action_space = action_space
+        #self.sensor_space = sensor_space
+        self.torch_model_action=torch_model_action
+        self.torch_model_recurrent=torch_model_recurrent
+        self.initial_state=initial_state
+        self.stochastic=stochastic
+
+        self.actions_vectors = []
+        for a in range(self.action_space.n):
+            v = torch.zeros(1, self.action_space.n)
+            v[0][a] = 1
+            self.actions_vectors.append(Variable(v))
+
+    def observe(self, observation):
+        if (isinstance(observation, np.ndarray)):
+            observation = torch.Tensor(observation)
+        o=Variable(observation.unsqueeze(0))
+        self.state=self.torch_model_recurrent(self.state,o,self.last_action)
+        pass
+
+    def sample(self):
+        scores=self.torch_model_action(self.state)
+        if (self.stochastic):
+            scores=scores.multinomial(1)
+            action=scores.data[0][0]
+            self.last_action = self.actions_vectors[action]
+            return action
+
+        action=scores.max(1)
+        action=action[1].data
+        action=action[0][0]
+
+        self.last_action=self.actions_vectors[action]
+        return action
+
+
+    def start_episode(self, **parameters):
+        self.state=Variable(self.initial_state)
+        self.last_action=Variable(torch.zeros(1,self.action_space.n))

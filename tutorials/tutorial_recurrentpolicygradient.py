@@ -3,6 +3,7 @@ import torch.optim as optim
 import torch_rl.learners as learners
 import torch
 import gym
+from torch_rl.tools import rl_evaluate_policy, rl_evaluate_policy_multiple_times
 
 
 LEARNING_RATE=0.001
@@ -72,6 +73,10 @@ learning_algorithm=learners.LearnerRecurrentPolicyGradient(action_space=env.acti
 learning_algorithm.reset()
 while(True):
     learning_algorithm.step(env=env,discount_factor=0.9,maximum_episode_length=100)
+    policy=learning_algorithm.get_policy()
+    r=rl_evaluate_policy_multiple_times(env,policy,100,1.0,10)
+    print("Evaluation avg reward = %f "% r)
+
     print("Reward = %f"%learning_algorithm.log.get_last_dynamic_value("total_reward"))
 
 

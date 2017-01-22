@@ -97,5 +97,4 @@ class LearnerPolicyGradient(Learner):
         Params:
             - stochastic: True if one wants a stochastic policy, False if one wants a policy based on the argmax of the output probabilities
         '''
-        assert stochastic==False
-        return DiscreteModelPolicy(self.actions_space,self.torch_model)
+        return DiscreteModelPolicy(self.action_space,self.torch_model,stochastic=stochastic)

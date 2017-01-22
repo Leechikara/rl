@@ -153,4 +153,4 @@ class LearnerDQN(Learner):
 
 
     def get_policy(self):
-        return DiscreteModelPolicy(self.actions_space,self.torch_model)
+        return DiscreteModelPolicy(self.action_space,self.torch_model)

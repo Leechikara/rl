@@ -1,2 +1,2 @@
-from torch_rl.tools.Memory import Memory
-
+from .Memory import Memory
+from .tools import *
