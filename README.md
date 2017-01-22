@@ -1,11 +1,11 @@
 # torch_rl : A starting Reinforcement Learning PyTorch Library
 
-Torch_rl is a (small) RL library for PyTorch that can be used to:
+Torch_rl is a (small) Sequential Learning (and Reinforcement Learning) library for PyTorch that can be used to:
 * learn policies over openAI Gym environments
 * learn policies with DQN or Policy Gradient techniques (more to come)
 * Model complex environements (not only reward-based environment)
 
-torch_rl will certainly change a lot during the next weeks....
+Note that the library will evolve during the next months.
 
 ## Gerating Documentation
 
@@ -32,6 +32,7 @@ Go to the `docs` directory then: `PYTHONPATH=.. make html`. The generated HTML f
   * (...more to come...)
 
 * the `tutorials` directory contains simple examples
+
 
 
 
