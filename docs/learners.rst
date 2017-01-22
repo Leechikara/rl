@@ -29,3 +29,9 @@ LearnerBatchPolicyGradient
 ---------------------
 .. autoclass:: LearnerBatchPolicyGradient
 	:members:
+
+LearnerRecurrentPolicyGradient
+---------------------
+.. autoclass:: LearnerBatchPolicyGradient
+	:members:
+
