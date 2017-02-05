@@ -20,16 +20,19 @@ class LearnerRecurrentPolicyGradient(Learner):
         - initial_state: the state h_0
         - optimizer: the SGD optimizer (using the torch_model parameters)
     '''
-    def __init__(self,log=LearnerLog(),action_space=None,average_reward_window=10,torch_model_action=None,torch_model_recurrent=None,initial_state=None,optimizer=None):
+    def __init__(self,log=LearnerLog(),action_space=None,average_reward_window=10,torch_model_action=None,torch_model_recurrent=None,initial_state=None,optimizer=None,cuda=False):
         self.optimizer=optimizer
         self.average_reward_window=average_reward_window
         self.action_space=action_space
+        self.cuda=cuda
 
         #Creation of the one hot vectors for actions inputs
         self.actions_vectors=[]
         for a in range(self.action_space.n):
             v=torch.zeros(1,self.action_space.n)
             v[0][a]=1
+            if (self.cuda):
+                v=v.cuda()
             self.actions_vectors.append(Variable(v))
 
 
@@ -75,16 +78,26 @@ class LearnerRecurrentPolicyGradient(Learner):
         if (isinstance(self.observation,np.ndarray)):
             self.observation=torch.Tensor(self.observation)
 
+        if (self.cuda):
+            self.observation=self.observation.cuda()
+
         self.observation=Variable(self.observation.unsqueeze(0))
-        self.state=self.torch_model_recurrent(self.state,self.observation,Variable(torch.zeros(1,self.action_space.n)))
+        va=torch.zeros(1,self.action_space.n)
+        if (self.cuda):
+            va=va.cuda()
+        self.state=self.torch_model_recurrent(self.state,self.observation,Variable(va))
         sum_reward=0
         for t in range(maximum_episode_length):
             action = self.sample_action()
             self.observation,immediate_reward,finished,info=env.step(action)
             if (render):
                 env.render()
+
             if (isinstance(self.observation, np.ndarray)):
                 self.observation = torch.Tensor(self.observation)
+            if (self.cuda):
+                self.observation=self.observation.cuda()
+
             self.observation = Variable(self.observation.unsqueeze(0))
             sum_reward=sum_reward+immediate_reward
             self.rewards.append(immediate_reward)
@@ -109,6 +122,9 @@ class LearnerRecurrentPolicyGradient(Learner):
             self.memory_past_rewards[t - 1].push(discounted_reward)
             avg_reward = self.memory_past_rewards[t - 1].mean()
             rein=torch.Tensor([[discounted_reward - avg_reward]])
+            if (self.cuda):
+                rein=rein.cuda()
+
             self.actions_taken[t - 1].reinforce(rein)
             grads.append(None)
         torch.autograd.backward(self.actions_taken, grads)
@@ -120,13 +136,13 @@ class LearnerRecurrentPolicyGradient(Learner):
         Params:
             - stochastic: True if one wants a stochastic policy, False if one wants a policy based on the argmax of the output probabilities
         '''
-        return DiscreteRecurrentModelPolicy(self.action_space,self.torch_model_action,self.torch_model_recurrent,self.initial_state,stochastic)
+        return DiscreteRecurrentModelPolicy(self.action_space,self.torch_model_action,self.torch_model_recurrent,self.initial_state,stochastic=stochastic,cuda=self.cuda)
 
 
 class DiscreteRecurrentModelPolicy(Policy):
     '''A Discrete policy based on a recurrent neural network'''
 
-    def __init__(self, action_space, torch_model_action,torch_model_recurrent,initial_state,stochastic=False):
+    def __init__(self, action_space, torch_model_action,torch_model_recurrent,initial_state,stochastic=False,cuda=False):
         Policy.__init__(self, action_space)
         assert isinstance(action_space, gym.spaces.Discrete), "In DiscreteModelPolicy, the action space must be discrete"
         #assert isinstance(sensor_space, torch_rl.spaces.PytorchBox), "In DeeQPolicy, sensor_space must be a PytorchBox"
@@ -137,16 +153,22 @@ class DiscreteRecurrentModelPolicy(Policy):
         self.torch_model_recurrent=torch_model_recurrent
         self.initial_state=initial_state
         self.stochastic=stochastic
+        self.cuda=cuda
 
         self.actions_vectors = []
         for a in range(self.action_space.n):
             v = torch.zeros(1, self.action_space.n)
+            if (self.cuda):
+                v=v.cuda()
             v[0][a] = 1
             self.actions_vectors.append(Variable(v))
 
     def observe(self, observation):
         if (isinstance(observation, np.ndarray)):
             observation = torch.Tensor(observation)
+        if (self.cuda):
+            observation=observation.cuda()
+
         o=Variable(observation.unsqueeze(0))
         self.state=self.torch_model_recurrent(self.state,o,self.last_action)
         pass
@@ -170,3 +192,5 @@ class DiscreteRecurrentModelPolicy(Policy):
     def start_episode(self, **parameters):
         self.state=Variable(self.initial_state)
         self.last_action=Variable(torch.zeros(1,self.action_space.n))
+        if (self.cuda):
+            self.last_action=self.last_action.cuda()
