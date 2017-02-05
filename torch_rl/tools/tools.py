@@ -1,4 +1,4 @@
-
+import time
 
 '''
 Evaluate a policy over one trajectory

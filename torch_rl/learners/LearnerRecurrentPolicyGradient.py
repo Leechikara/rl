@@ -128,6 +128,8 @@ class LearnerRecurrentPolicyGradient(Learner):
             self.actions_taken[t - 1].reinforce(rein)
             grads.append(None)
         torch.autograd.backward(self.actions_taken, grads)
+        #for p in self.torch_model_recurrent.parameters():
+        #    print(p.grad.data)
         self.optimizer.step()
 
 

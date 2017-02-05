@@ -17,12 +17,14 @@ class LearnerPolicyGradient(Learner):
         - torch_model: the pytorch model taking as input an observation, and returning a probability for each possible action
         - optimizer: the SGD optimizer (using the torch_model parameters)
     '''
-    def __init__(self,log=LearnerLog(),action_space=None,average_reward_window=10,torch_model=None,optimizer=None):
+    def __init__(self,log=LearnerLog(),action_space=None,average_reward_window=10,torch_model=None,optimizer=None,entropy_coefficient=0.0):
         self.torch_model=torch_model
         self.optimizer=optimizer
         self.average_reward_window=average_reward_window
         self.action_space=action_space
         self.log=log
+        self.entropy_coefficient=entropy_coefficient
+
 
     def reset(self,**parameters):
         #Initilize the memories where the rewards (for each time step) will be stored
@@ -30,7 +32,16 @@ class LearnerPolicyGradient(Learner):
         pass
 
     def sample_action(self):
-        probabilities = self.torch_model(Variable(self.observation.unsqueeze(0)))
+        obs=self.observation.unsqueeze(0)
+        probabilities = self.torch_model(Variable(obs,requires_grad=True))
+        ent=probabilities*probabilities.log()
+        ent=ent.sum()
+        if (self.entropy is None):
+            self.entropy=ent
+        else:
+            self.entropy=self.entropy+ent
+
+
         a = probabilities.multinomial(1)
         self.actions_taken.append(a)
         return (a.data[0][0])
@@ -53,6 +64,7 @@ class LearnerPolicyGradient(Learner):
         if (isinstance(self.observation,np.ndarray)):
             self.observation=torch.Tensor(self.observation)
 
+        self.entropy=None
         #Draw the episode
         sum_reward=0
         for t in range(maximum_episode_length):
@@ -88,7 +100,13 @@ class LearnerPolicyGradient(Learner):
             self.actions_taken[t - 1].reinforce(rein)
             grads.append(None)
 
-        torch.autograd.backward(self.actions_taken, grads)
+        torch.autograd.backward(self.actions_taken, grads,retain_variables=True)
+        self.entropy=self.entropy/T
+        print("Entropy is %f" % self.entropy.data[0])
+
+        if (self.entropy_coefficient>0):
+            self.entropy=self.entropy*self.entropy_coefficient
+            self.entropy.backward()
         self.optimizer.step()
 
 
