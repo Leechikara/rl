@@ -17,9 +17,10 @@ class LearnerPolicyGradient(Learner):
         - torch_model: the pytorch model taking as input an observation, and returning a probability for each possible action
         - optimizer: the SGD optimizer (using the torch_model parameters)
     '''
-    def __init__(self,log=LearnerLog(),action_space=None,average_reward_window=10,torch_model=None,optimizer=None,entropy_coefficient=0.0):
+    def __init__(self,log=LearnerLog(),action_space=None,average_reward_window=10,torch_model=None,optimizer=None,entropy_coefficient=0.0,cuda=False):
         self.torch_model=torch_model
         self.optimizer=optimizer
+        self.cuda=cuda
         self.average_reward_window=average_reward_window
         self.action_space=action_space
         self.log=log
@@ -97,6 +98,10 @@ class LearnerPolicyGradient(Learner):
             self.memory_past_rewards[t - 1].push(discounted_reward)
             avg_reward = self.memory_past_rewards[t - 1].mean()
             rein=torch.Tensor([[discounted_reward - avg_reward]])
+
+            if (self.cuda):
+                rein=rein.cuda()
+
             self.actions_taken[t - 1].reinforce(rein)
             grads.append(None)
 

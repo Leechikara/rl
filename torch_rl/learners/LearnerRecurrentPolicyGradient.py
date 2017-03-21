@@ -20,11 +20,12 @@ class LearnerRecurrentPolicyGradient(Learner):
         - initial_state: the state h_0
         - optimizer: the SGD optimizer (using the torch_model parameters)
     '''
-    def __init__(self,log=LearnerLog(),action_space=None,average_reward_window=10,torch_model_action=None,torch_model_recurrent=None,initial_state=None,optimizer=None,cuda=False):
+    def __init__(self,log=LearnerLog(),action_space=None,average_reward_window=10,torch_model_action=None,torch_model_recurrent=None,initial_state=None,entropy_coefficient=0.0,optimizer=None,cuda=False):
         self.optimizer=optimizer
         self.average_reward_window=average_reward_window
         self.action_space=action_space
         self.cuda=cuda
+        self.entropy_coefficient=entropy_coefficient
 
         #Creation of the one hot vectors for actions inputs
         self.actions_vectors=[]
@@ -50,6 +51,11 @@ class LearnerRecurrentPolicyGradient(Learner):
 
     def sample_action(self):
         probabilities = self.torch_model_action(self.state)
+        if (self.entropy is None):
+            self.entropy=(probabilities*probabilities.log()).sum(1)
+        else:
+            self.entropy =self.entropy+(probabilities*probabilities.log()).sum(1)
+
         a = probabilities.multinomial(1)
         self.actions_taken.append(a)
         return (a.data[0][0])
@@ -71,6 +77,7 @@ class LearnerRecurrentPolicyGradient(Learner):
 
         self.actions_taken=[]
         self.rewards = []
+        self.entropy=None
 
         self.observation=env.reset()
         if (render):
@@ -105,11 +112,11 @@ class LearnerRecurrentPolicyGradient(Learner):
                 break
             self.state = self.torch_model_recurrent(self.state, self.observation,self.actions_vectors[action])
 
+        T = len(self.actions_taken)
         self.log.new_iteration()
         self.log.add_dynamic_value("total_reward",sum_reward)
-
+        self.log.add_dynamic_value("entropy",self.entropy.data[0][0]/T)
         #Update the policy
-        T = len(self.actions_taken)
         Tm = len(self.memory_past_rewards)
         for t in range(Tm, T):
             self.memory_past_rewards.append(Memory(self.average_reward_window))
@@ -127,7 +134,10 @@ class LearnerRecurrentPolicyGradient(Learner):
 
             self.actions_taken[t - 1].reinforce(rein)
             grads.append(None)
-        torch.autograd.backward(self.actions_taken, grads)
+        torch.autograd.backward(self.actions_taken, grads,retain_variables=True)
+        if (self.entropy_coefficient!=0):
+            (self.entropy_coefficient*self.entropy/T).backward()
+
         #for p in self.torch_model_recurrent.parameters():
         #    print(p.grad.data)
         self.optimizer.step()

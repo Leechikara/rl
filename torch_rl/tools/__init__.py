@@ -1,2 +1,3 @@
-from .Memory import Memory
+from .Memory import *
+from .TransitionMemory import *
 from .tools import *

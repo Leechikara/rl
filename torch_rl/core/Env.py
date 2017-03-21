@@ -30,6 +30,6 @@ class Env(gym.Env):
         return self.sensor.observe(self.world)
 
     def _render(self, mode='human', close=False):
-            raise NotImplementedError
+            pass
 
 
